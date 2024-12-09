@@ -81,8 +81,6 @@ const selectedRowClusterIconFactory = function (selectedMarkerGetter) {
 // Optionally, we can also set accept-language to 'he' for Hebrew results.
 let geocoder = L.Control.Geocoder && L.Control.Geocoder.nominatim({
   geocodingQueryParams: {
-    countrycodes: 'il',        // Focus on Israel
-    'accept-language': 'he'    // Prefer Hebrew (optional)
   }
 });
 
