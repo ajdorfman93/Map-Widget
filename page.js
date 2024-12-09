@@ -9,7 +9,7 @@ let selectedRowId = null;
 let selectedRecords = null;
 let mode = 'multi';
 let mapSource = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}';
-let mapCopyright = 'Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NRCAN, Esri Japan, METI, Esri China (Hong Kong), Esri (Thailand), TomTom, 2012';
+let mapCopyright = 'Tiles &copy; Esri';
 
 // Required, Label value
 const Name = "Name";
@@ -21,15 +21,13 @@ const Latitude = "Latitude";
 const Geocode = 'Geocode';
 // Optional - but required for geocoding. Field with address to find (might be formula)
 const Address = 'Address';
-// Optional - but useful for geocoding. Blank field which map uses
-// to store last geocoded Address.
+// Optional - but useful for geocoding.
 const GeocodedAddress = 'GeocodedAddress';
 
 let lastRecord;
 let lastRecords;
 
-//Color markers downloaded from leaflet repo, color-shifted to green
-//Used to show currently selected pin
+//Color markers
 const selectedIcon =  new L.Icon({
   iconUrl: 'marker-icon-green.png',
   iconRetinaUrl: 'marker-icon-green-2x.png',
@@ -41,12 +39,10 @@ const selectedIcon =  new L.Icon({
 });
 const defaultIcon =  new L.Icon.Default();
 
-
 // Creates clusterIcons that highlight if they contain selected row
 const selectedRowClusterIconFactory = function (selectedMarkerGetter) {
   return function(cluster) {
     var childCount = cluster.getChildCount();
-
     let isSelected = false;
     try {
       const selectedMarker = selectedMarkerGetter();
@@ -55,7 +51,6 @@ const selectedRowClusterIconFactory = function (selectedMarkerGetter) {
       console.error("WARNING: Error in clusterIconFactory in map widget");
       console.error(e);
     }
-
     var c = ' marker-cluster-';
     if (childCount < 10) {
       c += 'small';
@@ -64,7 +59,6 @@ const selectedRowClusterIconFactory = function (selectedMarkerGetter) {
     } else {
       c += 'large';
     }
-
     return new L.DivIcon({
         html: '<div><span>'
             + childCount
@@ -76,39 +70,34 @@ const selectedRowClusterIconFactory = function (selectedMarkerGetter) {
   }
 };
 
-// Update the geocoder to handle Israeli addresses more accurately.
-// By specifying countrycodes='il', we focus searches on Israel.
-// Optionally, we can also set accept-language to 'he' for Hebrew results.
-let geocoder = L.Control.Geocoder && L.Control.Geocoder.nominatim({
-  geocodingQueryParams: {
-  }
-});
-
-if (URLSearchParams && location.search && geocoder) {
-  const c = new URLSearchParams(location.search).get('geocoder');
-  if (c && L.Control.Geocoder[c]) {
-    console.log('Using geocoder', c);
-    geocoder = L.Control.Geocoder[c]();
-  } else if (c) {
-    console.warn('Unsupported geocoder', c);
-  }
-  const m = new URLSearchParams(location.search).get('mode');
-  if (m) { mode = m; }
-}
-
+// Replace Nominatim-based geocode function with geocode.xyz:
 async function geocode(address) {
-  return new Promise((resolve, reject) => {
-    try {
-      geocoder.geocode(address, (v) => {
-        v = v[0];
-        if (v) { v = v.center; }
-        resolve(v);
-      });
-    } catch (e) {
-      console.log("Problem:", e);
-      reject(e);
+  // Encode the address for safe URL usage
+  const encodedAddress = encodeURIComponent(address);
+  // Example request to geocode.xyz. Consider adding an API key if you have one.
+  // region=IL focuses the search on Israel.
+  // Throttling: free users may need to add a delay or handle limits.
+  const url = `https://geocode.xyz/${encodedAddress}?json=1&region=IL&auth=<Y73289369377240847621x125371>&geoit=json`;
+
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) {
+      console.warn("Geocoding request failed:", resp.status, resp.statusText);
+      return null;
     }
-  });
+    const data = await resp.json();
+
+    // Check if lat/long are available
+    if (data && data.latt && data.longt) {
+      return { lat: parseFloat(data.latt), lng: parseFloat(data.longt) };
+    } else {
+      console.warn("No results found for:", address, data);
+      return null;
+    }
+  } catch (e) {
+    console.error("Error during geocoding:", e);
+    return null;
+  }
 }
 
 async function delay(ms) {
@@ -119,7 +108,7 @@ async function delay(ms) {
 
 // If widget has write access
 let writeAccess = true;
-// A ongoing scanning promise, to check if we are in progress.
+// A ongoing scanning promise
 let scanning = null;
 
 async function scan(tableId, records, mappings) {
@@ -139,6 +128,7 @@ async function scan(tableId, records, mappings) {
         [mappings[Latitude]]: result ? result.lat : null,
         ...(GeocodedAddress in mappings) ? {[mappings[GeocodedAddress]]: address} : undefined
       }] ]);
+      // Add a delay to avoid hitting rate limits on geocode.xyz if scanning multiple records
       await delay(1000);
     }
   }
@@ -172,9 +162,7 @@ function getInfo(rec) {
   return result;
 }
 
-// Function to clear last added markers.
 let clearMakers = () => {};
-
 let markers = [];
 
 function updateMap(data) {
@@ -213,7 +201,6 @@ function updateMap(data) {
   map.createPane('otherMarkers').style.zIndex = 600;
 
   const points = [];
-
   popups = {};
 
   markers = L.markerClusterGroup({
@@ -250,8 +237,8 @@ function updateMap(data) {
 
     popups[id] = marker;
   }
-  map.addLayer(markers);
 
+  map.addLayer(markers);
   clearMakers = () => map.removeLayer(markers);
 
   try {
@@ -259,16 +246,15 @@ function updateMap(data) {
   } catch (err) {
     console.warn('cannot fit bounds');
   }
+
   function makeSureSelectedMarkerIsShown() {
     const rowId = selectedRowId;
-
     if (rowId && popups[rowId]) {
       var marker = popups[rowId];
       if (!marker._icon) { markers.zoomToShowLayer(marker); }
       marker.openPopup();
     }
   }
-
   amap = map;
   makeSureSelectedMarkerIsShown();
 }
@@ -281,16 +267,11 @@ function selectMaker(id) {
    }
    const marker = popups[id];
    if (!marker) { return null; }
-
    selectedRowId = id;
-
    marker.setIcon(selectedIcon);
    previouslyClicked.pane = 'selectedMarker';
-
    markers.refreshClusters();
-
    grist.setCursorPos?.({rowId: id}).catch(() => {});
-
    return marker;
 }
 
@@ -318,7 +299,6 @@ function defaultMapping(record, mappings) {
 
 function selectOnMap(rec) {
   if (selectedRowId === rec.id) { return; }
-
   selectedRowId = rec.id;
   if (mode === 'single') {
     updateMap([rec]);
@@ -339,6 +319,7 @@ grist.onRecord((record, mappings) => {
     marker.openPopup();
   }
 });
+
 grist.onRecords((data, mappings) => {
   lastRecords = grist.mapColumnNames(data) || data;
   if (mode !== 'single') {
@@ -394,7 +375,7 @@ grist.ready({
     { name: "Longitude", type: 'Numeric'} ,
     { name: "Latitude", type: 'Numeric'},
     { name: "Geocode", type: 'Bool', title: 'Geocode', optional},
-    { name: "Address", type: 'Text', optional, optional},
+    { name: "Address", type: 'Text', optional},
     { name: "GeocodedAddress", type: 'Text', title: 'Geocoded Address', optional},
   ],
   allowSelectBy: true,
