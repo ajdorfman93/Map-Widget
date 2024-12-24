@@ -3,13 +3,13 @@
   "description": "Widget for showing geolocated data on a map.",
   "homePage": "https://github.com/gristlabs/grist-widget",
   "version": "0.0.1",
-  "grist": [
+  "grist": 
     {
       "name": "Map",
       "url": "https://gristlabs.github.io/grist-widget/map/index.html",
       "widgetId": "@gristlabs/widget-map#map",
       "published": true,
-      "accessLevel": "full access",
+      "accessLevel": "full",
       "renderAfterReady": true,
       "description": "Display locations on a map using either addresses or latitude and longitude coordinates..",
       "authors": [
@@ -18,7 +18,7 @@
           "url": "https://github.com/gristlabs"
         }
       ],
-      "isGristLabsMaintained": true
+      "isGristLabsMaintained": false
     }
-  ]
+  
 }
