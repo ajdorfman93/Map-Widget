@@ -19,14 +19,7 @@
   </style>
 </head>
 <body>
-  <span style="background: white; color: black">
-  </span>
-
-  <!-- Added input field to supply the Google Maps API key -->
-  <div>
-    <label for="apiKeyInput"></label>
-    <input type="text" id="apiKeyInput" placeholder="Enter your API key" />
-  </div>
+  <!-- Removed the manual input field. The API key will come from a record's Api_key column. -->
 
   <div id="widget-container">
     <div id="grid">
@@ -34,52 +27,53 @@
   </div>
 
   <script>
-    // Make Grist plugin ready with full access to the specified columns
-    grist.ready({ requiredAccess: 'full', columns: ['Address', 'Latitude', 'Longitude'], allowSelectBy: true });
+    // Request 'Address', 'Latitude', 'Longitude', and 'Api_key' columns
+    grist.ready({
+      requiredAccess: 'full',
+      columns: ['Address', 'Latitude', 'Longitude', 'Api_key'],
+      allowSelectBy: true
+    });
 
     let addressColumn = null;
     let latitudeColumn = null;
     let longitudeColumn = null;
-    const previousAddresses = new Map();
+    let apiKeyColumn = null;
 
-    // Removed the hard-coded API key and replaced with a variable
-    let geocodeApiKey = '';
+    const previousAddresses = new Map();
     const geocodeUrl = 'https://maps.googleapis.com/maps/api/geocode/json';
 
-    // On page load, listen for changes in the API key input
-    document.getElementById('apiKeyInput').addEventListener('input', (event) => {
-      geocodeApiKey = event.target.value.trim();
-    });
-
+    // Listen for records sent from Grist
     grist.onRecord((record, mapping) => {
       if (!record) {
         return;
       }
+
+      // Identify which columns are which
       addressColumn = mapping['Address'];
       latitudeColumn = mapping['Latitude'];
       longitudeColumn = mapping['Longitude'];
+      apiKeyColumn = mapping['Api_key'];
 
-      // Store the initial address for comparison if not already tracked
+      // Remember the old address if we don't already have it
       if (!previousAddresses.has(record.id)) {
         previousAddresses.set(record.id, record[addressColumn]);
       }
 
-      // Automatically update coordinates if the address has changed
+      // If the address changed, run the geocoding
       const currentAddress = record[addressColumn];
       if (currentAddress && previousAddresses.get(record.id) !== currentAddress) {
         updateCoordinates(record);
       }
     });
 
-    async function fetchCoordinates(address) {
-      // Check if user has provided an API key
-      if (!geocodeApiKey) {
-        console.error('No Google Maps API key provided.');
+    async function fetchCoordinates(address, apiKey) {
+      // If there is no API key in this record, skip
+      if (!apiKey) {
+        console.error('No Google Maps API key provided for this record.');
         return null;
       }
 
-      const url = `${geocodeUrl}?address=${encodeURIComponent(address)}&key=${geocodeApiKey}`;
-
+      const url = `${geocodeUrl}?address=${encodeURIComponent(address)}&key=${apiKey}`;
       try {
         const response = await fetch(url);
         const data = await response.json();
@@ -98,13 +92,16 @@
 
     async function updateCoordinates(record) {
       const address = record[addressColumn];
+      const geocodeApiKey = record[apiKeyColumn];
       if (!address) {
         console.warn('Address is empty for record:', record.id);
         return;
       }
 
-      const coordinates = await fetchCoordinates(address);
+      // Fetch fresh coordinates
+      const coordinates = await fetchCoordinates(address, geocodeApiKey);
       if (coordinates) {
+        // Construct the data to update in Grist
         const delta = {
           id: record.id,
           fields: {
@@ -114,7 +111,7 @@
         };
         await grist.selectedTable.update(delta);
 
-        // Update the stored address after successful update
+        // Update our local cache of the old address
         previousAddresses.set(record.id, address);
       }
     }
