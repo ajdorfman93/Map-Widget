@@ -19,7 +19,7 @@
   </style>
 </head>
 <body>
-  <!-- Removed the manual input field. The API key will come from a record's Api_key column. -->
+  <!-- Removed the manual input field. The API key will come from a record's Api Key column. -->
 
   <div id="widget-container">
     <div id="grid">
@@ -27,10 +27,10 @@
   </div>
 
   <script>
-    // Request 'Address', 'Latitude', 'Longitude', and 'Api_key' columns
+    // Request 'Address', 'Latitude', 'Longitude', and 'Api Key' columns
     grist.ready({
       requiredAccess: 'full',
-      columns: ['Address', 'Latitude', 'Longitude', 'Api_key'],
+      columns: ['Address', 'Latitude', 'Longitude', 'Api Key'],
       allowSelectBy: true
     });
 
